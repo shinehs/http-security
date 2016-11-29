@@ -1,2 +1,1 @@
-# http-security
-http防劫持
+#JavaScript防http劫持与XSS
