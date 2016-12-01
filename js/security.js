@@ -2,7 +2,7 @@
 * @Author: shine
 * @Date:   2016-11-29 15:19:36
 * @Last Modified by:   hs
-* @Last Modified time: 2016-11-30 14:31:55
+* @Last Modified time: 2016-12-01 14:44:44
 * @description 使用Javascript实现前端防御http劫持及防御XSS攻击。
 * @version: v1.0.0
 */
@@ -16,10 +16,8 @@
 
 	//安全域
 	var safeList = [
-			'www.yy.com',
-			'm.yy.com',
-			'w.3g.yy.com',
-			'wap.yy.com'
+			/([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic)+(\.)+[A-Za-z]{2,14}/g,//*.yy.com
+			/((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic)+(\.)+[A-Za-z]{2,14}/i,//http开头
 			];
 	
 	//危险域
@@ -29,8 +27,7 @@
 
 	//过滤关键词
 	var filterKeyWordList = [
-		'xss',
-		'BAIDU_SSP__wrapper',
+		'BAIDU_DUP_wrapper',//百度推广
     'BAIDU_DSPUI_FLOWBAR'
 	];
 
