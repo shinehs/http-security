@@ -2,43 +2,48 @@
 * @Author: shine
 * @Date:   2016-11-29 15:19:36
 * @Last Modified by:   hs
-* @Last Modified time: 2016-12-01 14:44:44
+* @Last Modified time: 2016-12-02 18:01:29
 * @description 使用Javascript实现前端防御http劫持及防御XSS攻击。
 * @version: v1.0.0
 */
 
 'use strict';
 (function(window,undefined){
-	
-	var security = function(){},
-			inlineEventMap = {},//内联事件扫描记录
-			inlineEventId = 0;//内联事件扫描ID
+  
+  var security = function(){},
+      inlineEventMap = {},//内联事件扫描记录
+      inlineEventId = 0;//内联事件扫描ID
 
-	//安全域
-	var safeList = [
-			/([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic)+(\.)+[A-Za-z]{2,14}/g,//*.yy.com
-			/((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic)+(\.)+[A-Za-z]{2,14}/i,//http开头
-			];
-	
-	//危险域
-	var dangerList = [
-			''
-		];
+  //安全域
+  var safeList = [
+      /([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic)+(\.)+[A-Za-z]{2,14}/g,//*.yy.com
+      /((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic)+(\.)+[A-Za-z]{2,14}/i,//http开头
+      ];
+  
+  //危险域
+  var dangerList = [
+      
+    ];
 
-	//过滤关键词
-	var filterKeyWordList = [
-		'BAIDU_DUP_wrapper',//百度推广
+  //过滤关键词
+  var filterKeyWordList = [
+    'BAIDU_DUP_wrapper',//百度推广
     'BAIDU_DSPUI_FLOWBAR'
-	];
+  ];
 
- 	/**
- 	 * 过滤指定关键字
- 	 * @param  {[Array]} 过滤词库 
+  var inlineEventList = [
+    'alert',
+    'location'
+  ];
+  /**
+   * 过滤指定关键字
+   * @param  {[Array]} 过滤词库 
    * @param  {[String]} value    [需要验证的字符串]
    * @return {[Boolean]}         [false -- 验证不通过，true -- 验证通过]
- 	 */
+   */
   function filter(list,value){
-  	var length = list.length,
+    if(typeof(value)=='undefined')return true;
+    var length = list.length,
       i = 0;
 
     for (; i < length; i++) {
@@ -52,19 +57,19 @@
     }
     return false;
   }
-	//内联事件劫持
-	function inlineEventFilter(){
-		var i = 0,
+  //内联事件劫持
+  function inlineEventFilter(){
+    var i = 0,
         obj = null;
-
+    
     for (obj in document) {
       if (/^on./.test(obj)) {
         interceptionInlineEvent(obj, i++);
       }
     }
-	}
+  }
 
-	/**
+  /**
    * 内联事件拦截
    * @param  {[String]} eventName [内联事件名]
    * @param  {[Number]} eventID   [内联事件id]
@@ -87,8 +92,8 @@
    */
   function scanElement(elem, isClick, eventName, eventID) {
     var flag = elem['isScan'],
-      	code = "",// 扫描内联代码
-      	hash = 0;
+        code = "",// 扫描内联代码
+        hash = 0;
 
     // 跳过已扫描的事件
     if (!flag) {
@@ -110,7 +115,7 @@
     //扫描包括 a iframe img video div 等所有可以写内联事件的元素
     if (elem[eventName]) {
       code = elem.getAttribute(eventName);
-      if (code && filter(filterKeyWordList, code)) {
+      if (code && filter(inlineEventList, code)) {
         // 注销事件
         elem[eventName] = null;
         console.log('拦截可疑内联事件:' + code);
@@ -120,7 +125,7 @@
     // 扫描 <a href="javascript:"> 的脚本
     if (isClick && elem.tagName == 'A' && elem.protocol == 'javascript:') {
       var code = elem.href.substr(11);
-      if (filter(filterKeyWordList, string)) {
+      if (filter(inlineEventList, code)) {
         // 注销代码
         elem.href = 'javascript:void(0)';
         console.log('拦截可疑事件:' + code);
@@ -150,14 +155,14 @@
           // 扫描 script 与 iframe
           if (node.tagName === 'SCRIPT' || node.tagName === 'IFRAME') {
             // 拦截到可疑iframe
-            if (node.tagName === 'IFRAME' && node.srcdoc) {
+            if (node.tagName === 'IFRAME' && node.src) {
               node.parentNode.removeChild(node);
-              console.log('拦截到可疑iframe', node.srcdoc);
+              console.log('拦截到可疑iframe', node.src);
 
             } else if (node.src) {
               // 只放行白名单
               if (!filter(dangerList, node.src)) {
-                node.parentNode.removeChild(node);
+                node.parentNode && node.parentNode.removeChild(node);
                 console.log('拦截可疑静态脚本:', node.src);
               }
             }
@@ -185,7 +190,8 @@
     document.addEventListener('DOMNodeInserted', function(e) {
       var node = e.target;
       //如果加入元素的src在黑名单内，就删除节点
-      if (filter(dangerList,node.src) || filter(filterKeyWordList,node.innerHTML)) {
+      
+      if (!filter(safeList,node.src) || filter(filterKeyWordList,node.innerHTML)) {
         node.parentNode.removeChild(node);
       }
     }, true);
@@ -193,12 +199,12 @@
 
   // 重写 createElement
   function resetCreateElement() {
-  	// var oldcrt = document.createElement;
-  	// document.createElement = function(nodeName){
+    // var oldcrt = document.createElement;
+    // document.createElement = function(nodeName){
 
-  	// }
-  	// //调用劫持
-  	// oldcrt.apply(document, arguments);
+    // }
+    // //调用劫持
+    // oldcrt.apply(document, arguments);
   }
 
   /**
@@ -322,8 +328,8 @@
     
     if (self != top) {
       var parentUrl = document.referrer,
-        	length = safeList.length,
-        	i = 0;
+          length = safeList.length,
+          i = 0;
 
       for (; i < length; i++) {
         // 建立白名单正则
@@ -346,14 +352,16 @@
         console.log('页面被嵌入iframe中:', parentUrl);
         top.location.href = parts.join('#');
       } catch (e) {
-      	console.log('页面被嵌入iframe中,重定向失败');
+        console.log('页面被嵌入iframe中,重定向失败');
       }
     }
   }
 
     // 初始化方法
   security.init = function() {
-    interceptionInlineEvent();
+    interceptionDynamicScript();
+
+    inlineEventFilter();
 
     interceptionStaticScript();
 
@@ -365,5 +373,5 @@
   }
 
   window.httpSecurity = security;
-
+  security.init();
 })(window);
