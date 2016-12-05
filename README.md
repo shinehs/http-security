@@ -1,4 +1,4 @@
-#JS防http劫持
+#JavaScript防http劫持与XSS
 1、使用方法：调用 httpSecurity.init()
 
 2、建立自己的黑白名单、上报系统及接收后端
