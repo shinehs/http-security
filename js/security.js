@@ -2,7 +2,7 @@
 * @Author: shine
 * @Date:   2016-11-29 15:19:36
 * @Last Modified by:   hs
-* @Last Modified time: 2016-12-02 18:01:29
+* @Last Modified time: 2016-12-05 17:47:34
 * @description 使用Javascript实现前端防御http劫持及防御XSS攻击。
 * @version: v1.0.0
 */
@@ -155,8 +155,8 @@
           // 扫描 script 与 iframe
           if (node.tagName === 'SCRIPT' || node.tagName === 'IFRAME') {
             // 拦截到可疑iframe
-            if (node.tagName === 'IFRAME' && node.src) {
-              node.parentNode.removeChild(node);
+            if (node.tagName === 'IFRAME' && node.src && !filter(safeList, node.src)) {
+              node.parentNode && node.parentNode.removeChild(node);
               console.log('拦截到可疑iframe', node.src);
 
             } else if (node.src) {
@@ -186,21 +186,22 @@
    * @return {[type]} [description]
    */
   function interceptionDynamicScript() {
-    // DOMNodeInserted 的执行时机早于 MutationObserver
     document.addEventListener('DOMNodeInserted', function(e) {
       var node = e.target;
-      //如果加入元素的src在黑名单内，就删除节点
       
       if (!filter(safeList,node.src) || filter(filterKeyWordList,node.innerHTML)) {
         node.parentNode.removeChild(node);
+        console.log('拦截可以创建节点：'+ node.nodeName + ',id为：'+(node.id?node.id:''))
       }
     }, true);
   }
 
   // 重写 createElement
   function resetCreateElement() {
+    // var old_write = window.document.write;
+
     // var oldcrt = document.createElement;
-    // document.createElement = function(nodeName){
+    // window.Element.prototype.createElement = function(nodeName){
 
     // }
     // //调用劫持
@@ -220,8 +221,6 @@
         console.log('拦截可疑模块:', string);
         return;
       }
-
-      // 调用原始接口
       old_write.apply(document, arguments);
     }
   }
@@ -232,7 +231,6 @@
    * @return {[type]} [description]
    */
   function resetSetAttribute(window) {
-    // 保存原有接口
     var old_setAttribute = window.Element.prototype.setAttribute;
 
     window.Element.prototype.setAttribute = function(name, value) {
@@ -242,8 +240,6 @@
           return;
         }
       }
-
-      // 调用原始接口
       old_setAttribute.apply(this, arguments);
     };
   }
@@ -264,28 +260,23 @@
    * @return {[type]}       [description]
    */
   function installHook(window) {
-    // 重写单个 window 窗口的 setAttribute 属性
+
     resetSetAttribute(window);
-    // 重写单个 window 窗口的 document.Write 属性
     resetDocumentWrite(window);
 
     // MutationObserver 的不同兼容性写法
     var MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
 
-    // 该构造函数用来实例化一个新的 Mutation 观察者对象
-    // Mutation 观察者对象能监听在某个范围内的 DOM 树变化
     var observer = new MutationObserver(function(mutations) {
       mutations.forEach(function(mutation) {
-        // 返回被添加的节点,或者为null.
         var nodes = mutation.addedNodes;
 
-        // 逐个遍历
         for (var i = 0; i < nodes.length; i++) {
           var node = nodes[i];
 
           // 给生成的 iframe 里环境也装上重写的钩子
           if (node.tagName == 'IFRAME') {
-            installHook(node.contentWindow);
+            node.contentWindow && installHook(node.contentWindow);
           }
         }
       });
