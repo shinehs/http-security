@@ -2,7 +2,7 @@
 * @Author: shine
 * @Date:   2016-11-29 15:19:36
 * @Last Modified by:   hs
-* @Last Modified time: 2016-12-05 17:47:34
+* @Last Modified time: 2016-12-07 09:56:09
 * @description 使用Javascript实现前端防御http劫持及防御XSS攻击。
 * @version: v1.0.0
 */
@@ -12,7 +12,8 @@
   
   var security = function(){},
       inlineEventMap = {},//内联事件扫描记录
-      inlineEventId = 0;//内联事件扫描ID
+      inlineEventId = 0,//内联事件扫描ID
+      scanInlineElement = false;//是否需要扫描内联事件
 
   //安全域
   var safeList = [
@@ -352,8 +353,8 @@
   security.init = function() {
     interceptionDynamicScript();
 
-    inlineEventFilter();
-
+    scanInlineElement && inlineEventFilter();
+    
     interceptionStaticScript();
 
     lockCallAndApply();
