@@ -2,14 +2,23 @@
 * @Author: shine
 * @Date:   2016-11-29 15:19:36
 * @Last Modified by:   hs
-* @Last Modified time: 2016-12-07 09:56:09
+* @Last Modified time: 2016-12-07 17:24:38
 * @description 使用Javascript实现前端防御http劫持及防御XSS攻击。
 * @version: v1.0.0
 */
 
 'use strict';
 (function(window,undefined){
+  // this.stat({act_type: 7});
   
+  var hiido_param = {
+     'eventid': 10010793,
+     'value':'url',
+     'act_type':getPageType(), //事件类型
+     'sys':,//移动端必备，0=IOS/1=WEB/2=Android
+     'hostid':,//主播uid
+     'sid':,//频道id
+  }
   var security = function(){},
       inlineEventMap = {},//内联事件扫描记录
       inlineEventId = 0,//内联事件扫描ID
@@ -316,8 +325,8 @@
    * 重定向iframe url（页面被iframe包裹）
    */
   function redirectionIframeSrc() {
-    var flag = 'iframe_hijack_redirected';//TODO 暂定
-    
+    var flag = 'iframe_wrapper';
+
     if (self != top) {
       var parentUrl = document.referrer,
           length = safeList.length,
@@ -341,15 +350,30 @@
         parts[0] += '?' + flag + '=1';
       }
       try {
-        console.log('页面被嵌入iframe中:', parentUrl);
         top.location.href = parts.join('#');
+        console.log('页面被嵌入iframe中:', parentUrl);
       } catch (e) {
         console.log('页面被嵌入iframe中,重定向失败');
       }
     }
   }
 
-    // 初始化方法
+  /**
+   * 获得当前页面类型的方法
+   * @return {[number]} [1,2,3]首页，直播间，下载页。
+   */
+  function getPageType(){
+    var url = location.href,
+        result = 1;
+    if((/channel/i).test(url)){
+      result = 3;//下载页
+    }else if((/mobileweb/i).test(url)){
+      result = 2;//直播间
+    }
+    return result;
+  }
+
+  // 初始化方法
   security.init = function() {
     interceptionDynamicScript();
 
