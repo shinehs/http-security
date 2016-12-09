@@ -2,23 +2,14 @@
 * @Author: shine
 * @Date:   2016-11-29 15:19:36
 * @Last Modified by:   hs
-* @Last Modified time: 2016-12-07 17:24:38
+* @Last Modified time: 2016-12-09 16:43:41
 * @description 使用Javascript实现前端防御http劫持及防御XSS攻击。
 * @version: v1.0.0
 */
 
 'use strict';
 (function(window,undefined){
-  // this.stat({act_type: 7});
-  
-  var hiido_param = {
-     'eventid': 10010793,
-     'value':'url',
-     'act_type':getPageType(), //事件类型
-     'sys':,//移动端必备，0=IOS/1=WEB/2=Android
-     'hostid':,//主播uid
-     'sid':,//频道id
-  }
+
   var security = function(){},
       inlineEventMap = {},//内联事件扫描记录
       inlineEventId = 0,//内联事件扫描ID
@@ -26,14 +17,14 @@
 
   //安全域
   var safeList = [
-      /([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic)+(\.)+[A-Za-z]{2,14}/g,//*.yy.com
-      /((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic)+(\.)+[A-Za-z]{2,14}/i,//http开头
+      /([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic|baidu|hiido|qq)+(\.)+[A-Za-z]{2,14}/g,//*.yy.com
+      /((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic|baidu|hiido|qq)+(\.)+[A-Za-z]{2,14}/i,//http开头
       ];
   
   //危险域
   var dangerList = [
       
-    ];
+  ];
 
   //过滤关键词
   var filterKeyWordList = [
@@ -45,6 +36,32 @@
     'alert',
     'location'
   ];
+  //reset console
+  if(!console){
+    console = {
+      log:function(){
+        return true;
+      }
+    };
+  }
+  
+  /**
+   * 统计上报函数
+   * @param  {[type]} url 拦截脚本地址
+   * @param  {[type]} className 拦截插入元素className
+   * @param  {[type]} eName 内联事件名称
+   * @param  {[type]} fUrl ifrmae乔套url
+   */
+  function hiidoStat(url,className,eName,fUrl){
+    var hiido_param = {
+      'eventid': 10010793,
+      'bak1':url,
+      'bak2':className,
+      'bak3':eName,
+      'parm1':fUrl
+     }
+    on_security_interdiction && on_security_interdiction.call(window,hiido_param);
+  }
   /**
    * 过滤指定关键字
    * @param  {[Array]} 过滤词库 
@@ -52,7 +69,11 @@
    * @return {[Boolean]}         [false -- 验证不通过，true -- 验证通过]
    */
   function filter(list,value){
-    if(typeof(value)=='undefined')return true;
+    if(list == safeList){
+      if(typeof(value)=='undefined' || value === '')return true;
+    }else{
+      if(typeof(value)=='undefined' || value === '')return false;
+    }
     var length = list.length,
       i = 0;
 
@@ -128,7 +149,8 @@
       if (code && filter(inlineEventList, code)) {
         // 注销事件
         elem[eventName] = null;
-        console.log('拦截可疑内联事件:' + code);
+        hiidoStat('','',code,'');
+        // console.log('拦截可疑内联事件:' + code);
       }
     }
 
@@ -138,7 +160,8 @@
       if (filter(inlineEventList, code)) {
         // 注销代码
         elem.href = 'javascript:void(0)';
-        console.log('拦截可疑事件:' + code);
+        hiidoStat('','',code,'');
+        // console.log('拦截可疑事件:' + code);
       }
     }
 
@@ -167,13 +190,15 @@
             // 拦截到可疑iframe
             if (node.tagName === 'IFRAME' && node.src && !filter(safeList, node.src)) {
               node.parentNode && node.parentNode.removeChild(node);
-              console.log('拦截到可疑iframe', node.src);
+              hiidoStat('','','',node.src);
+              // console.log('拦截到可疑iframe', node.src);
 
             } else if (node.src) {
               // 只放行白名单
-              if (!filter(dangerList, node.src)) {
+              if (!filter(safeList, node.src)) {
                 node.parentNode && node.parentNode.removeChild(node);
-                console.log('拦截可疑静态脚本:', node.src);
+                hiidoStat('','','',node.src);
+                // console.log('拦截可疑静态脚本:', node.src);
               }
             }
           }
@@ -201,7 +226,7 @@
       
       if (!filter(safeList,node.src) || filter(filterKeyWordList,node.innerHTML)) {
         node.parentNode.removeChild(node);
-        console.log('拦截可以创建节点：'+ node.nodeName + ',id为：'+(node.id?node.id:''))
+        // console.log('拦截可以创建节点：'+ node.nodeName + ',id为：'+(node.id?node.id:''))
       }
     }, true);
   }
@@ -228,7 +253,8 @@
 
     window.document.write = function(string) {
       if (filter(filterKeyWordList, string)) {
-        console.log('拦截可疑模块:', string);
+        hiidoStat('',string,'','');
+        // console.log('拦截可疑模块:', string);
         return;
       }
       old_write.apply(document, arguments);
@@ -246,7 +272,8 @@
     window.Element.prototype.setAttribute = function(name, value) {
       if (this.tagName == 'SCRIPT' && /^src$/i.test(name)) {
         if (!filter(safeList, value)) {
-          console.log('拦截可疑模块:', value);
+          hiidoStat(value,'','','');
+          // console.log('拦截可疑模块:', value);
           return;
         }
       }
@@ -351,30 +378,18 @@
       }
       try {
         top.location.href = parts.join('#');
-        console.log('页面被嵌入iframe中:', parentUrl);
+        hiidoStat('','','',parentUrl);
+        // console.log('页面被嵌入iframe中:', parentUrl);
       } catch (e) {
-        console.log('页面被嵌入iframe中,重定向失败');
+        hiidoStat('','','',parentUrl);
+        // console.log('页面被嵌入iframe中,重定向失败');
       }
     }
   }
 
-  /**
-   * 获得当前页面类型的方法
-   * @return {[number]} [1,2,3]首页，直播间，下载页。
-   */
-  function getPageType(){
-    var url = location.href,
-        result = 1;
-    if((/channel/i).test(url)){
-      result = 3;//下载页
-    }else if((/mobileweb/i).test(url)){
-      result = 2;//直播间
-    }
-    return result;
-  }
-
   // 初始化方法
   security.init = function() {
+
     interceptionDynamicScript();
 
     scanInlineElement && inlineEventFilter();
@@ -388,6 +403,16 @@
     redirectionIframeSrc();
   }
 
-  window.httpSecurity = security;
-  security.init();
+  
+  if (typeof define === "function" && define.amd) {
+      define("security", [], function() {
+          return security;
+      });
+  } else {
+      window.security =  security;
+  }
+  //go init
+  if(!(/localhost/i).test(location.host)){
+    security.init();
+  }
 })(window);
