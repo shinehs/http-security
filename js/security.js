@@ -2,34 +2,48 @@
 * @Author: shine
 * @Date:   2016-11-29 15:19:36
 * @Last Modified by:   hs
-* @Last Modified time: 2016-12-09 16:43:41
+* @Last Modified time: 2016-12-16 14:28:09
 * @description 使用Javascript实现前端防御http劫持及防御XSS攻击。
-* @version: v1.0.0
+* @version: v1.0.2
 */
 
 'use strict';
-(function(window,undefined){
+(function(window){
 
   var security = function(){},
-      inlineEventMap = {},//内联事件扫描记录
-      inlineEventId = 0,//内联事件扫描ID
+      inlineEventMap = {}, //内联事件扫描记录
+      inlineEventId = 0, //内联事件扫描ID
       scanInlineElement = false;//是否需要扫描内联事件
 
   //安全域
   var safeList = [
-      /([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic|baidu|hiido|qq)+(\.)+[A-Za-z]{2,14}/g,//*.yy.com
-      /((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|yystatic|baidu|hiido|qq)+(\.)+[A-Za-z]{2,14}/i,//http开头
+      /([a-zA-Z|a-zA-Z\d])+(\.)+(yy|duowan|yystatic|baidu|hiido|qq|baidu|gclick|minisplat|baidustatic)+(\.)+[A-Za-z]{2,14}/g, //*.yy.com
+      /((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|duowan|yystatic|baidu|hiido|qq|baidu|gclick|minisplat|baidustatic)+(\.)+[A-Za-z]{2,14}/i, //http开头
+      /wvjbscheme:\/\/__WVJB_QUEUE_MESSAGE__/i//手Y内部命令
       ];
   
   //危险域
-  var dangerList = [
-      
+  // var dangerList = [];
+
+  //过滤class关键词
+  var filterClassName = [
+    'BAIDU_DUP_wrapper', //百度推广
+    'BAIDU_DSPUI_FLOWBAR'
   ];
 
-  //过滤关键词
-  var filterKeyWordList = [
-    'BAIDU_DUP_wrapper',//百度推广
-    'BAIDU_DSPUI_FLOWBAR'
+  //过滤name关键词
+  var filterProName = [
+    'text',
+    '#text',
+    'IFRAME',
+    'SCRIPT',
+    'IMG',
+    '__WeiboJSInvokeIframe'
+  ];
+
+  //过滤id关键词
+  var filterNodeId = [
+    '1qa2ws'
   ];
 
   var inlineEventList = [
@@ -38,7 +52,7 @@
   ];
   //reset console
   if(!console){
-    console = {
+    window.console = {
       log:function(){
         return true;
       }
@@ -52,15 +66,15 @@
    * @param  {[type]} eName 内联事件名称
    * @param  {[type]} fUrl ifrmae乔套url
    */
-  function hiidoStat(url,className,eName,fUrl){
-    var hiido_param = {
+  function hiidoStat(url, className, eName, fUrl){
+    var hiidoParam = {
       'eventid': 10010793,
       'bak1':url,
       'bak2':className,
       'bak3':eName,
       'parm1':fUrl
-     }
-    on_security_interdiction && on_security_interdiction.call(window,hiido_param);
+    };
+    window.on_security_interdiction && window.on_security_interdiction.call(window, hiidoParam);
   }
   /**
    * 过滤指定关键字
@@ -68,11 +82,15 @@
    * @param  {[String]} value    [需要验证的字符串]
    * @return {[Boolean]}         [false -- 验证不通过，true -- 验证通过]
    */
-  function filter(list,value){
-    if(list == safeList){
-      if(typeof(value)=='undefined' || value === '')return true;
+  function filter(list, value){
+    if(list === safeList){
+      if(typeof(value) === 'undefined' || value === ''){
+        return true;
+      }
     }else{
-      if(typeof(value)=='undefined' || value === '')return false;
+      if(typeof(value) === 'undefined' || value === ''){
+        return false;
+      }
     }
     var length = list.length,
       i = 0;
@@ -88,6 +106,7 @@
     }
     return false;
   }
+
   //内联事件劫持
   function inlineEventFilter(){
     var i = 0,
@@ -107,7 +126,7 @@
    * @return {[type]}             [description]
    */
   function interceptionInlineEvent(eventName, eventID) {
-    var isClick = (eventName == 'onclick');
+    var isClick = (eventName === 'onclick');
 
     document.addEventListener(eventName.substr(2), function(e) {
       scanElement(e.target, isClick, eventName, eventID);
@@ -122,13 +141,13 @@
    * @param  {[Number]} eventID [给每个内联 on* 事件一个id]
    */
   function scanElement(elem, isClick, eventName, eventID) {
-    var flag = elem['isScan'],
-        code = "",// 扫描内联代码
+    var flag = elem.isScan,
+        code = '', // 扫描内联代码
         hash = 0;
 
     // 跳过已扫描的事件
     if (!flag) {
-      flag = elem['isScan'] = ++inlineEventId;
+      flag = elem.isScan = ++inlineEventId;
     }
 
     hash = (flag << 8) | eventID;
@@ -140,7 +159,7 @@
     inlineEventMap[hash] = true;
 
     // 非元素节点
-    if (elem.nodeType != Node.ELEMENT_NODE) {
+    if (elem.nodeType !== Node.ELEMENT_NODE) {
       return;
     }
     //扫描包括 a iframe img video div 等所有可以写内联事件的元素
@@ -149,18 +168,18 @@
       if (code && filter(inlineEventList, code)) {
         // 注销事件
         elem[eventName] = null;
-        hiidoStat('','',code,'');
+        // hiidoStat('', '', code, '');
         // console.log('拦截可疑内联事件:' + code);
       }
     }
 
     // 扫描 <a href="javascript:"> 的脚本
-    if (isClick && elem.tagName == 'A' && elem.protocol == 'javascript:') {
-      var code = elem.href.substr(11);
+    if (isClick && elem.tagName === 'A' && elem.protocol === 'javascript:') {
+      code = elem.href.substr(11);
       if (filter(inlineEventList, code)) {
         // 注销代码
         elem.href = 'javascript:void(0)';
-        hiidoStat('','',code,'');
+        // hiidoStat('', '', code, '');
         // console.log('拦截可疑事件:' + code);
       }
     }
@@ -190,14 +209,14 @@
             // 拦截到可疑iframe
             if (node.tagName === 'IFRAME' && node.src && !filter(safeList, node.src)) {
               node.parentNode && node.parentNode.removeChild(node);
-              hiidoStat('','','',node.src);
+              // hiidoStat('', '', '', node.src);
               // console.log('拦截到可疑iframe', node.src);
 
             } else if (node.src) {
               // 只放行白名单
               if (!filter(safeList, node.src)) {
                 node.parentNode && node.parentNode.removeChild(node);
-                hiidoStat('','','',node.src);
+                // hiidoStat('', '', '', node.src);
                 // console.log('拦截可疑静态脚本:', node.src);
               }
             }
@@ -224,7 +243,7 @@
     document.addEventListener('DOMNodeInserted', function(e) {
       var node = e.target;
       
-      if (!filter(safeList,node.src) || filter(filterKeyWordList,node.innerHTML)) {
+      if (!filter(safeList, node.src) || filter(filterClassName, node.className) || filter(filterProName, node.name) || filter(filterNodeId, node.id)) {
         node.parentNode.removeChild(node);
         // console.log('拦截可以创建节点：'+ node.nodeName + ',id为：'+(node.id?node.id:''))
       }
@@ -232,7 +251,7 @@
   }
 
   // 重写 createElement
-  function resetCreateElement() {
+  // function resetCreateElement() {
     // var old_write = window.document.write;
 
     // var oldcrt = document.createElement;
@@ -241,7 +260,7 @@
     // }
     // //调用劫持
     // oldcrt.apply(document, arguments);
-  }
+  // }
 
   /**
    * 重写单个 window 窗口的 document.write 属性
@@ -249,16 +268,16 @@
    * @return {[type]}       [description]
    */
   function resetDocumentWrite(window) {
-    var old_write = window.document.write;
+    var overWrite = window.document.write;
 
     window.document.write = function(string) {
-      if (filter(filterKeyWordList, string)) {
-        hiidoStat('',string,'','');
+      if (filter(filterClassName, string) || filter(filterProName, string) || filter(filterNodeId, string)) {
+        // hiidoStat('', string, '', '');
         // console.log('拦截可疑模块:', string);
         return;
       }
-      old_write.apply(document, arguments);
-    }
+      overWrite.apply(document, arguments);
+    };
   }
 
   /**
@@ -267,17 +286,17 @@
    * @return {[type]} [description]
    */
   function resetSetAttribute(window) {
-    var old_setAttribute = window.Element.prototype.setAttribute;
+    var overWrite = window.Element.prototype.setAttribute;
 
     window.Element.prototype.setAttribute = function(name, value) {
-      if (this.tagName == 'SCRIPT' && /^src$/i.test(name)) {
+      if (this.tagName === 'SCRIPT' && /^src$/i.test(name)) {
         if (!filter(safeList, value)) {
-          hiidoStat(value,'','','');
+          // hiidoStat(value, '', '', '');
           // console.log('拦截可疑模块:', value);
           return;
         }
       }
-      old_setAttribute.apply(this, arguments);
+      overWrite.apply(this, arguments);
     };
   }
 
@@ -312,7 +331,7 @@
           var node = nodes[i];
 
           // 给生成的 iframe 里环境也装上重写的钩子
-          if (node.tagName == 'IFRAME') {
+          if (node.tagName === 'IFRAME') {
             node.contentWindow && installHook(node.contentWindow);
           }
         }
@@ -354,7 +373,7 @@
   function redirectionIframeSrc() {
     var flag = 'iframe_wrapper';
 
-    if (self != top) {
+    if (self !== top) {
       var parentUrl = document.referrer,
           length = safeList.length,
           i = 0;
@@ -378,10 +397,10 @@
       }
       try {
         top.location.href = parts.join('#');
-        hiidoStat('','','',parentUrl);
+        // hiidoStat('', '', '', parentUrl);
         // console.log('页面被嵌入iframe中:', parentUrl);
       } catch (e) {
-        hiidoStat('','','',parentUrl);
+        // hiidoStat('', '', '', parentUrl);
         // console.log('页面被嵌入iframe中,重定向失败');
       }
     }
@@ -401,17 +420,18 @@
     defenseIframe();
 
     redirectionIframeSrc();
-  }
+  };
 
   
-  if (typeof define === "function" && define.amd) {
-      define("security", [], function() {
+  if (typeof define === 'function' && define.amd) {
+      define('security', [], function() {
           return security;
       });
   } else {
       window.security =  security;
   }
   //go init
+  
   if(!(/localhost/i).test(location.host)){
     security.init();
   }
