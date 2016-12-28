@@ -2,9 +2,9 @@
 * @Author: shine
 * @Date:   2016-11-29 15:19:36
 * @Last Modified by:   hs
-* @Last Modified time: 2016-12-16 14:28:09
+* @Last Modified time: 2016-12-28 16:32:56
 * @description 使用Javascript实现前端防御http劫持及防御XSS攻击。
-* @version: v1.0.2
+* @version: v1.0.0
 */
 
 'use strict';
@@ -17,9 +17,11 @@
 
   //安全域
   var safeList = [
-      /([a-zA-Z|a-zA-Z\d])+(\.)+(yy|duowan|yystatic|baidu|hiido|qq|baidu|gclick|minisplat|baidustatic)+(\.)+[A-Za-z]{2,14}/g, //*.yy.com
-      /((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|duowan|yystatic|baidu|hiido|qq|baidu|gclick|minisplat|baidustatic)+(\.)+[A-Za-z]{2,14}/i, //http开头
-      /wvjbscheme:\/\/__WVJB_QUEUE_MESSAGE__/i//手Y内部命令
+      '/([a-zA-Z|a-zA-Z\d])+(\.)+(yy|duowan|yystatic|baidu|hiido|qq|baidu|gclick|minisplat|baidustatic)+(\.)+[A-Za-z]{2,14}/', //*.yy.com
+      '/((https|http):\/\/)+([a-zA-Z|a-zA-Z\d])+(\.)+(yy|duowan|yystatic|baidu|hiido|qq|baidu|gclick|minisplat|baidustatic)+(\.)+[A-Za-z]{2,14}/', //http开头
+      '/wvjbscheme:\/\/__WVJB_QUEUE_MESSAGE__/', //手Y内部命令
+      '/weixin:+[A-Za-z]*/', //微信相关
+      '/baidu:+[A-Za-z]*:/'  //百度相关 
       ];
   
   //危险域
@@ -37,8 +39,7 @@
     '#text',
     'IFRAME',
     'SCRIPT',
-    'IMG',
-    '__WeiboJSInvokeIframe'
+    'IMG'
   ];
 
   //过滤id关键词
@@ -74,7 +75,36 @@
       'bak3':eName,
       'parm1':fUrl
     };
+    h5Report(url, className, eName, fUrl);
     window.on_security_interdiction && window.on_security_interdiction.call(window, hiidoParam);
+  }
+
+  /**
+   * h5性能检测统计
+   * @param  {[type]} url 拦截脚本地址
+   * @param  {[type]} className 拦截插入元素className
+   * @param  {[type]} eName 内联事件名称
+   * @param  {[type]} iframeUrl ifrmae乔套url
+   */
+  function h5Report(url, className, eName, iframeUrl){
+    var databody = {},
+        queryStr = '';
+
+    databody.url = url?url:'';
+    databody.classname = className?className:'';
+    databody.name = eName?eName:'';
+    databody.iframeurl = iframeUrl?iframeUrl:'';
+    databody.pathname = window.location.pathname;
+    databody.hostname = window.location.hostname;
+    databody.ua = navigator.userAgent;
+
+    for(var n in databody){
+      if(databody[n] !== ''){
+        queryStr += n + '=' + databody[n] + '&';
+      }
+    }
+
+    (new Image).src = 'http://h5.yy.com/hostage/report?' + queryStr;
   }
   /**
    * 过滤指定关键字
@@ -168,7 +198,7 @@
       if (code && filter(inlineEventList, code)) {
         // 注销事件
         elem[eventName] = null;
-        // hiidoStat('', '', code, '');
+        hiidoStat('', '', code, '');
         // console.log('拦截可疑内联事件:' + code);
       }
     }
@@ -179,7 +209,7 @@
       if (filter(inlineEventList, code)) {
         // 注销代码
         elem.href = 'javascript:void(0)';
-        // hiidoStat('', '', code, '');
+        hiidoStat('', '', code, '');
         // console.log('拦截可疑事件:' + code);
       }
     }
@@ -196,6 +226,7 @@
   function interceptionStaticScript() {
     var MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
     // 该构造函数用来实例化一个新的 Mutation 观察者对象 Mutation 观察者对象能监听在某个范围内的 DOM 树变化
+    if(!MutationObserver)return;
     var observer = new MutationObserver(function(mutations) {
       mutations.forEach(function(mutation) {
         var nodes = mutation.addedNodes;
@@ -209,14 +240,14 @@
             // 拦截到可疑iframe
             if (node.tagName === 'IFRAME' && node.src && !filter(safeList, node.src)) {
               node.parentNode && node.parentNode.removeChild(node);
-              // hiidoStat('', '', '', node.src);
+              hiidoStat('', '', '', node.src);
               // console.log('拦截到可疑iframe', node.src);
 
             } else if (node.src) {
               // 只放行白名单
               if (!filter(safeList, node.src)) {
                 node.parentNode && node.parentNode.removeChild(node);
-                // hiidoStat('', '', '', node.src);
+                hiidoStat('', '', '', node.src);
                 // console.log('拦截可疑静态脚本:', node.src);
               }
             }
@@ -272,7 +303,7 @@
 
     window.document.write = function(string) {
       if (filter(filterClassName, string) || filter(filterProName, string) || filter(filterNodeId, string)) {
-        // hiidoStat('', string, '', '');
+        hiidoStat('', string, '', '');
         // console.log('拦截可疑模块:', string);
         return;
       }
@@ -291,7 +322,7 @@
     window.Element.prototype.setAttribute = function(name, value) {
       if (this.tagName === 'SCRIPT' && /^src$/i.test(name)) {
         if (!filter(safeList, value)) {
-          // hiidoStat(value, '', '', '');
+          hiidoStat(value, '', '', '');
           // console.log('拦截可疑模块:', value);
           return;
         }
@@ -322,7 +353,7 @@
 
     // MutationObserver 的不同兼容性写法
     var MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
-
+    if(!MutationObserver)return;
     var observer = new MutationObserver(function(mutations) {
       mutations.forEach(function(mutation) {
         var nodes = mutation.addedNodes;
@@ -350,21 +381,26 @@
    */
   function lockCallAndApply() {
     // 锁住 call
-    Object.defineProperty(Function.prototype, 'call', {
-      value: Function.prototype.call,
-      // 当且仅当仅当该属性的 writable 为 true 时，该属性才能被赋值运算符改变
-      writable: false,
-      // 当且仅当该属性的 configurable 为 true 时，该属性才能够被改变，也能够被删除
-      configurable: false,
-      enumerable: true
-    });
-    // 锁住 apply
-    Object.defineProperty(Function.prototype, 'apply', {
-      value: Function.prototype.apply,
-      writable: false,
-      configurable: false,
-      enumerable: true
-    });
+    try{
+      Object.defineProperty(Function.prototype, 'call', {
+        value: Function.prototype.call,
+        // 当且仅当仅当该属性的 writable 为 true 时，该属性才能被赋值运算符改变
+        writable: false,
+        // 当且仅当该属性的 configurable 为 true 时，该属性才能够被改变，也能够被删除
+        configurable: false,
+        enumerable: true
+      });
+      // 锁住 apply
+      Object.defineProperty(Function.prototype, 'apply', {
+        value: Function.prototype.apply,
+        writable: false,
+        configurable: false,
+        enumerable: true
+      });
+    }catch(e){
+      console && console.log(e);
+    }
+    
   }
 
   /**
@@ -397,10 +433,10 @@
       }
       try {
         top.location.href = parts.join('#');
-        // hiidoStat('', '', '', parentUrl);
+        hiidoStat('', '', '', parentUrl);
         // console.log('页面被嵌入iframe中:', parentUrl);
       } catch (e) {
-        // hiidoStat('', '', '', parentUrl);
+        hiidoStat('', '', '', parentUrl);
         // console.log('页面被嵌入iframe中,重定向失败');
       }
     }
@@ -431,8 +467,11 @@
       window.security =  security;
   }
   //go init
-  
-  if(!(/localhost/i).test(location.host)){
-    security.init();
+  if(navigator.appName == 'Microsoft Internet Explorer' && (navigator.appVersion .split(';')[1].replace(/[ ]/g, '')=='MSIE6.0' || navigator.appVersion .split(';')[1].replace(/[ ]/g, '')=='MSIE7.0' || navigator.appVersion .split(';')[1].replace(/[ ]/g, '')=='MSIE8.0')){
+    return ;
+  }else{
+    if(!(/localhost/i).test(location.host) || (navigator.appName === 'Microsoft Internet Explorer' && (navigator.appVersion.match(/7./i) !== '7.' || navigator.appVersion.match(/8./i) !== '8.') )){
+      security.init();
+    }
   }
 })(window);
